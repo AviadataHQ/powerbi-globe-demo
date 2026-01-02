@@ -1,12 +1,18 @@
-// Shapefiles.js (standalone version for GitHub Pages)
-// Requires: worldwind.min.js loaded BEFORE this file in index.html
+// Shapefiles.js (merged + standalone)
+// This file combines: Shapefiles demo + Configuration settings
+// REQUIREMENTS:
+// 1) index.html must load worldwind.min.js BEFORE this file
+// 2) index.html must contain elements with IDs:
+//    canvasOne, projectionDropdown, layerList, searchButton, searchText
 
 (function () {
   "use strict";
 
+  // ----------------------------
   // Safety check
+  // ----------------------------
   if (!window.WorldWind) {
-    console.error("WorldWind is not loaded. Make sure worldwind.min.js is loaded before Shapefiles.js");
+    console.error("WorldWind is not loaded. Make sure worldwind.min.js is loaded BEFORE Shapefiles.js");
     return;
   }
 
@@ -14,6 +20,12 @@
 
   // Tell WorldWind to log only warnings and errors.
   WorldWind.Logger.setLoggingLevel(WorldWind.Logger.LEVEL_WARNING);
+
+  // ----------------------------
+  // Configuration.js merge
+  // (Must be set BEFORE creating the WorldWindow)
+  // ----------------------------
+  WorldWind.configuration.gpuCacheSize = 500e6; // 500 MB
 
   // ----------------------------
   // Create the WorldWindow
@@ -24,14 +36,13 @@
   // Base layers + UI layers
   // ----------------------------
   const layers = [
-    // Imagery layers
     { name: "Blue Marble (BMNG)", layer: new WorldWind.BMNGLayer(), enabled: true },
-    { name: "Bing Aerial + Labels", layer: new WorldWind.BingAerialWithLabelsLayer(null), enabled: false },
+    { name: "BMNG + Landsat", layer: new WorldWind.BMNGLandsatLayer(), enabled: false },
+    { name: "Bing Aerial + Labels", layer: new WorldWind.BingAerialWithLabelsLayer(null), enabled: true },
+    { name: "Bing Roads", layer: new WorldWind.BingRoadsLayer(null), enabled: false },
 
-    // Atmosphere
     { name: "Atmosphere", layer: new WorldWind.AtmosphereLayer(), enabled: true },
 
-    // UI layers
     { name: "Compass", layer: new WorldWind.CompassLayer(), enabled: true },
     { name: "Coordinates", layer: new WorldWind.CoordinatesDisplayLayer(wwd), enabled: true },
     { name: "View Controls", layer: new WorldWind.ViewControlsLayer(wwd), enabled: true }
@@ -43,7 +54,7 @@
   });
 
   // ----------------------------
-  // Placemark attributes (for cities)
+  // Placemark attributes (cities)
   // ----------------------------
   const placemarkAttributes = new WorldWind.PlacemarkAttributes(null);
   placemarkAttributes.imageScale = 0.025;
@@ -71,12 +82,12 @@
     } else if (record.isPolygonType()) {
       configuration.attributes = new WorldWind.ShapeAttributes(null);
 
-      // Pastel fill
+      // Random pastel fill
       configuration.attributes.interiorColor = new WorldWind.Color(
         0.375 + 0.5 * Math.random(),
         0.375 + 0.5 * Math.random(),
         0.375 + 0.5 * Math.random(),
-        0.8
+        1.0
       );
 
       // Dark outline
@@ -94,11 +105,11 @@
   };
 
   // ----------------------------
-  // Load Shapefiles (Countries + Cities)
+  // Load shapefiles (Countries + Cities)
   // ----------------------------
   const shapefileLibrary = "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/naturalearth";
 
-  // Countries layer
+  // Countries
   const worldLayer = new WorldWind.RenderableLayer("Countries");
   const worldShapefile = new WorldWind.Shapefile(
     shapefileLibrary + "/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp"
@@ -106,7 +117,7 @@
   worldShapefile.load(null, shapeConfigurationCallback, worldLayer);
   wwd.addLayer(worldLayer);
 
-  // Cities layer
+  // Cities
   const cityLayer = new WorldWind.RenderableLayer("Cities");
   const cityShapefile = new WorldWind.Shapefile(
     shapefileLibrary + "/ne_50m_populated_places_simple/ne_50m_populated_places_simple.shp"
@@ -114,7 +125,7 @@
   cityShapefile.load(null, shapeConfigurationCallback, cityLayer);
   wwd.addLayer(cityLayer);
 
-  // (Optional) example extra layer
+  // Fort Story (Virginia Beach)
   const fortStoryUrl =
     "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/misc/FortStory/Trident-Spectre-Indigo-i.shp";
   const fortStoryLayer = new WorldWind.RenderableLayer("Fort Story");
@@ -123,11 +134,10 @@
   wwd.addLayer(fortStoryLayer);
 
   // ----------------------------
-  // UI: Layers list (checkboxes)
+  // UI: Layer checkboxes
   // ----------------------------
   const layerListDiv = document.getElementById("layerList");
 
-  // Include also the shapefile layers (Countries / Cities / Fort Story)
   const allLayerEntries = [
     ...layers.map(x => ({ name: x.name, layer: x.layer })),
     { name: "Countries", layer: worldLayer },
@@ -141,8 +151,6 @@
     layerListDiv.innerHTML = "";
 
     allLayerEntries.forEach(entry => {
-      const id = "layer_" + entry.name.replace(/\s+/g, "_");
-
       const item = document.createElement("label");
       item.className = "list-group-item";
       item.style.cursor = "pointer";
@@ -150,7 +158,6 @@
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = entry.layer.enabled;
-      checkbox.id = id;
       checkbox.style.marginRight = "10px";
 
       checkbox.addEventListener("change", () => {
@@ -187,7 +194,6 @@
   function buildProjectionDropdown() {
     if (!projectionDropdown) return;
 
-    // Bootstrap dropdown HTML
     projectionDropdown.innerHTML = `
       <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
         Projection <span class="caret"></span>
@@ -221,19 +227,16 @@
   const searchButton = document.getElementById("searchButton");
   const searchText = document.getElementById("searchText");
 
-  // Use the NASA geocoder endpoint (same as examples)
-  // If this endpoint ever fails, we can replace it with OpenStreetMap Nominatim.
   const geocoder = new WorldWind.NominatimGeocoder();
 
   function gotoLocation(query) {
     if (!query) return;
 
-    geocoder.lookup(query, (geocoderResults) => {
-      if (geocoderResults && geocoderResults.length > 0) {
-        const result = geocoderResults[0];
-        const lat = parseFloat(result.lat);
-        const lon = parseFloat(result.lon);
-
+    geocoder.lookup(query, (results) => {
+      if (results && results.length > 0) {
+        const r = results[0];
+        const lat = parseFloat(r.lat);
+        const lon = parseFloat(r.lon);
         wwd.goTo(new WorldWind.Location(lat, lon));
       } else {
         alert("Location not found: " + query);
@@ -242,18 +245,12 @@
   }
 
   if (searchButton && searchText) {
-    searchButton.addEventListener("click", () => {
-      gotoLocation(searchText.value.trim());
-    });
-
-    // Enter key
+    searchButton.addEventListener("click", () => gotoLocation(searchText.value.trim()));
     searchText.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        gotoLocation(searchText.value.trim());
-      }
+      if (e.key === "Enter") gotoLocation(searchText.value.trim());
     });
   }
 
-  // Force initial redraw
+  // Initial redraw
   wwd.redraw();
 })();
