@@ -1,128 +1,259 @@
-/*
- * Copyright 2003-2006, 2009, 2017, 2020 United States Government, as represented
- * by the Administrator of the National Aeronautics and Space Administration.
- * All rights reserved.
- *
- * The NASAWorldWind/WebWorldWind platform is licensed under the Apache License,
- * Version 2.0 (the "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License
- * at http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed
- * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- *
- * NASAWorldWind/WebWorldWind also contains the following 3rd party Open Source
- * software:
- *
- *    ES6-Promise – under MIT License
- *    libtess.js – SGI Free Software License B
- *    Proj4 – under MIT License
- *    JSZip – under MIT License
- *
- * A complete listing of 3rd Party software notices and licenses included in
- * WebWorldWind can be found in the WebWorldWind 3rd-party notices and licenses
- * PDF found in code  directory.
- */
-/**
- *  Illustrates how to load and display shapefiles.
- */
-requirejs(['./WorldWindShim',
-        './LayerManager'],
-    function (WorldWind,
-              LayerManager) {
-        "use strict";
+// Shapefiles.js (standalone version for GitHub Pages)
+// Requires: worldwind.min.js loaded BEFORE this file in index.html
 
-        // Tell WorldWind to log only warnings and errors.
-        WorldWind.Logger.setLoggingLevel(WorldWind.Logger.LEVEL_WARNING);
+(function () {
+  "use strict";
 
-        // Create the WorldWindow.
-        var wwd = new WorldWind.WorldWindow("canvasOne");
+  // Safety check
+  if (!window.WorldWind) {
+    console.error("WorldWind is not loaded. Make sure worldwind.min.js is loaded before Shapefiles.js");
+    return;
+  }
 
-        // Create and add layers to the WorldWindow.
-        var layers = [
-            // Imagery layers.
-            {layer: new WorldWind.BMNGLayer(), enabled: true},
-            {layer: new WorldWind.BingAerialWithLabelsLayer(null), enabled: true},
-            // Add atmosphere layer on top of all base layers.
-            {layer: new WorldWind.AtmosphereLayer(), enabled: true},
-            // WorldWindow UI layers.
-            {layer: new WorldWind.CompassLayer(), enabled: true},
-            {layer: new WorldWind.CoordinatesDisplayLayer(wwd), enabled: true},
-            {layer: new WorldWind.ViewControlsLayer(wwd), enabled: true}
-        ];
+  const WorldWind = window.WorldWind;
 
-        for (var l = 0; l < layers.length; l++) {
-            layers[l].layer.enabled = layers[l].enabled;
-            wwd.addLayer(layers[l].layer);
-        }
+  // Tell WorldWind to log only warnings and errors.
+  WorldWind.Logger.setLoggingLevel(WorldWind.Logger.LEVEL_WARNING);
 
-        // Set up the common placemark attributes.
-        var placemarkAttributes = new WorldWind.PlacemarkAttributes(null);
-        placemarkAttributes.imageScale = 0.025;
-        placemarkAttributes.imageColor = WorldWind.Color.WHITE;
-        placemarkAttributes.labelAttributes.offset = new WorldWind.Offset(
-            WorldWind.OFFSET_FRACTION, 0.5,
-            WorldWind.OFFSET_FRACTION, 1.0);
-        placemarkAttributes.imageSource = WorldWind.configuration.baseUrl + "images/white-dot.png";
+  // ----------------------------
+  // Create the WorldWindow
+  // ----------------------------
+  const wwd = new WorldWind.WorldWindow("canvasOne");
 
-        // Callback function for configuring shapefile visualization.
-        var shapeConfigurationCallback = function (attributes, record) {
-            var configuration = {};
-            configuration.name = attributes.values.name || attributes.values.Name || attributes.values.NAME;
+  // ----------------------------
+  // Base layers + UI layers
+  // ----------------------------
+  const layers = [
+    // Imagery layers
+    { name: "Blue Marble (BMNG)", layer: new WorldWind.BMNGLayer(), enabled: true },
+    { name: "Bing Aerial + Labels", layer: new WorldWind.BingAerialWithLabelsLayer(null), enabled: false },
 
-            if (record.isPointType()) { // Configure point-based features (cities, in this example)
-                configuration.name = attributes.values.name || attributes.values.Name || attributes.values.NAME;
+    // Atmosphere
+    { name: "Atmosphere", layer: new WorldWind.AtmosphereLayer(), enabled: true },
 
-                configuration.attributes = new WorldWind.PlacemarkAttributes(placemarkAttributes);
+    // UI layers
+    { name: "Compass", layer: new WorldWind.CompassLayer(), enabled: true },
+    { name: "Coordinates", layer: new WorldWind.CoordinatesDisplayLayer(wwd), enabled: true },
+    { name: "View Controls", layer: new WorldWind.ViewControlsLayer(wwd), enabled: true }
+  ];
 
-                if (attributes.values.pop_max) {
-                    var population = attributes.values.pop_max;
-                    configuration.attributes.imageScale = 0.01 * Math.log(population);
-                }
-            } else if (record.isPolygonType()) { // Configure polygon-based features (countries, in this example).
-                configuration.attributes = new WorldWind.ShapeAttributes(null);
+  layers.forEach(obj => {
+    obj.layer.enabled = obj.enabled;
+    wwd.addLayer(obj.layer);
+  });
 
-                // Fill the polygon with a random pastel color.
-                configuration.attributes.interiorColor = new WorldWind.Color(
-                    0.375 + 0.5 * Math.random(),
-                    0.375 + 0.5 * Math.random(),
-                    0.375 + 0.5 * Math.random(),
-                    1.0);
+  // ----------------------------
+  // Placemark attributes (for cities)
+  // ----------------------------
+  const placemarkAttributes = new WorldWind.PlacemarkAttributes(null);
+  placemarkAttributes.imageScale = 0.025;
+  placemarkAttributes.imageColor = WorldWind.Color.WHITE;
+  placemarkAttributes.labelAttributes.offset = new WorldWind.Offset(
+    WorldWind.OFFSET_FRACTION, 0.5,
+    WorldWind.OFFSET_FRACTION, 1.0
+  );
+  placemarkAttributes.imageSource = WorldWind.configuration.baseUrl + "images/white-dot.png";
 
-                // Paint the outline in a darker variant of the interior color.
-                configuration.attributes.outlineColor = new WorldWind.Color(
-                    0.5 * configuration.attributes.interiorColor.red,
-                    0.5 * configuration.attributes.interiorColor.green,
-                    0.5 * configuration.attributes.interiorColor.blue,
-                    1.0);
-            }
+  // ----------------------------
+  // Shapefile styling callback
+  // ----------------------------
+  const shapeConfigurationCallback = function (attributes, record) {
+    const configuration = {};
+    configuration.name = attributes.values.name || attributes.values.Name || attributes.values.NAME;
 
-            return configuration;
-        };
+    if (record.isPointType()) {
+      configuration.attributes = new WorldWind.PlacemarkAttributes(placemarkAttributes);
 
-        var shapefileLibrary = "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/naturalearth";
+      if (attributes.values.pop_max) {
+        const population = attributes.values.pop_max;
+        configuration.attributes.imageScale = 0.01 * Math.log(population);
+      }
+    } else if (record.isPolygonType()) {
+      configuration.attributes = new WorldWind.ShapeAttributes(null);
 
-        // Create data for the world.
-        var worldLayer = new WorldWind.RenderableLayer("Countries");
-        var worldShapefile = new WorldWind.Shapefile(shapefileLibrary + "/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp");
-        worldShapefile.load(null, shapeConfigurationCallback, worldLayer);
-        wwd.addLayer(worldLayer);
+      // Pastel fill
+      configuration.attributes.interiorColor = new WorldWind.Color(
+        0.375 + 0.5 * Math.random(),
+        0.375 + 0.5 * Math.random(),
+        0.375 + 0.5 * Math.random(),
+        0.8
+      );
 
-        // Create data for cities.
-        var cityLayer = new WorldWind.RenderableLayer("Cities");
-        var cityShapefile = new WorldWind.Shapefile(shapefileLibrary + "/ne_50m_populated_places_simple/ne_50m_populated_places_simple.shp");
-        cityShapefile.load(null, shapeConfigurationCallback, cityLayer);
-        wwd.addLayer(cityLayer);
+      // Dark outline
+      configuration.attributes.outlineColor = new WorldWind.Color(
+        0.5 * configuration.attributes.interiorColor.red,
+        0.5 * configuration.attributes.interiorColor.green,
+        0.5 * configuration.attributes.interiorColor.blue,
+        1.0
+      );
 
-        // Create data for Fort Story (Over Virginia Beach, VA. It can be seen near Norfolk.)
-        var fortStory = "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/misc/FortStory/Trident-Spectre-Indigo-i.shp";
-        var fortStoryLayer = new WorldWind.RenderableLayer("Fort Story");
-        var fortStoryShapefile = new WorldWind.Shapefile(fortStory);
-        fortStoryShapefile.load(null, null, fortStoryLayer);
-        wwd.addLayer(fortStoryLayer);
+      configuration.attributes.outlineWidth = 1.0;
+    }
 
-        // Create a layer manager for controlling layer visibility.
-        var layerManager = new LayerManager(wwd);
+    return configuration;
+  };
+
+  // ----------------------------
+  // Load Shapefiles (Countries + Cities)
+  // ----------------------------
+  const shapefileLibrary = "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/naturalearth";
+
+  // Countries layer
+  const worldLayer = new WorldWind.RenderableLayer("Countries");
+  const worldShapefile = new WorldWind.Shapefile(
+    shapefileLibrary + "/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp"
+  );
+  worldShapefile.load(null, shapeConfigurationCallback, worldLayer);
+  wwd.addLayer(worldLayer);
+
+  // Cities layer
+  const cityLayer = new WorldWind.RenderableLayer("Cities");
+  const cityShapefile = new WorldWind.Shapefile(
+    shapefileLibrary + "/ne_50m_populated_places_simple/ne_50m_populated_places_simple.shp"
+  );
+  cityShapefile.load(null, shapeConfigurationCallback, cityLayer);
+  wwd.addLayer(cityLayer);
+
+  // (Optional) example extra layer
+  const fortStoryUrl =
+    "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/misc/FortStory/Trident-Spectre-Indigo-i.shp";
+  const fortStoryLayer = new WorldWind.RenderableLayer("Fort Story");
+  const fortStoryShapefile = new WorldWind.Shapefile(fortStoryUrl);
+  fortStoryShapefile.load(null, null, fortStoryLayer);
+  wwd.addLayer(fortStoryLayer);
+
+  // ----------------------------
+  // UI: Layers list (checkboxes)
+  // ----------------------------
+  const layerListDiv = document.getElementById("layerList");
+
+  // Include also the shapefile layers (Countries / Cities / Fort Story)
+  const allLayerEntries = [
+    ...layers.map(x => ({ name: x.name, layer: x.layer })),
+    { name: "Countries", layer: worldLayer },
+    { name: "Cities", layer: cityLayer },
+    { name: "Fort Story", layer: fortStoryLayer }
+  ];
+
+  function rebuildLayerList() {
+    if (!layerListDiv) return;
+
+    layerListDiv.innerHTML = "";
+
+    allLayerEntries.forEach(entry => {
+      const id = "layer_" + entry.name.replace(/\s+/g, "_");
+
+      const item = document.createElement("label");
+      item.className = "list-group-item";
+      item.style.cursor = "pointer";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = entry.layer.enabled;
+      checkbox.id = id;
+      checkbox.style.marginRight = "10px";
+
+      checkbox.addEventListener("change", () => {
+        entry.layer.enabled = checkbox.checked;
+        wwd.redraw();
+      });
+
+      item.appendChild(checkbox);
+      item.appendChild(document.createTextNode(entry.name));
+      layerListDiv.appendChild(item);
     });
+  }
+
+  rebuildLayerList();
+
+  // ----------------------------
+  // UI: Projection dropdown
+  // ----------------------------
+  const projectionDropdown = document.getElementById("projectionDropdown");
+
+  const projections = [
+    { label: "3D Globe", projection: new WorldWind.ProjectionWgs84() },
+    { label: "Equirectangular", projection: new WorldWind.ProjectionEquirectangular() },
+    { label: "Mercator", projection: new WorldWind.ProjectionMercator() },
+    { label: "Polar Equidistant (North)", projection: new WorldWind.ProjectionPolarEquidistant("North") },
+    { label: "Polar Equidistant (South)", projection: new WorldWind.ProjectionPolarEquidistant("South") }
+  ];
+
+  function setProjection(proj) {
+    wwd.globe.projection = proj;
+    wwd.redraw();
+  }
+
+  function buildProjectionDropdown() {
+    if (!projectionDropdown) return;
+
+    // Bootstrap dropdown HTML
+    projectionDropdown.innerHTML = `
+      <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+        Projection <span class="caret"></span>
+      </button>
+      <ul class="dropdown-menu" role="menu" id="projectionMenu"></ul>
+    `;
+
+    const menu = document.getElementById("projectionMenu");
+
+    projections.forEach(p => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#";
+      a.textContent = p.label;
+
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        setProjection(p.projection);
+      });
+
+      li.appendChild(a);
+      menu.appendChild(li);
+    });
+  }
+
+  buildProjectionDropdown();
+
+  // ----------------------------
+  // UI: Destination search (GoTo)
+  // ----------------------------
+  const searchButton = document.getElementById("searchButton");
+  const searchText = document.getElementById("searchText");
+
+  // Use the NASA geocoder endpoint (same as examples)
+  // If this endpoint ever fails, we can replace it with OpenStreetMap Nominatim.
+  const geocoder = new WorldWind.NominatimGeocoder();
+
+  function gotoLocation(query) {
+    if (!query) return;
+
+    geocoder.lookup(query, (geocoderResults) => {
+      if (geocoderResults && geocoderResults.length > 0) {
+        const result = geocoderResults[0];
+        const lat = parseFloat(result.lat);
+        const lon = parseFloat(result.lon);
+
+        wwd.goTo(new WorldWind.Location(lat, lon));
+      } else {
+        alert("Location not found: " + query);
+      }
+    });
+  }
+
+  if (searchButton && searchText) {
+    searchButton.addEventListener("click", () => {
+      gotoLocation(searchText.value.trim());
+    });
+
+    // Enter key
+    searchText.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        gotoLocation(searchText.value.trim());
+      }
+    });
+  }
+
+  // Force initial redraw
+  wwd.redraw();
+})();
