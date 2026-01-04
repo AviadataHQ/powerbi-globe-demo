@@ -23,6 +23,7 @@
 
   // ----------------------------
   // Configuration.js merge
+  WorldWind.configuration.baseUrl = "./";
   // (Must be set BEFORE creating the WorldWindow)
   // ----------------------------
   WorldWind.configuration.gpuCacheSize = 500e6; // 500 MB
