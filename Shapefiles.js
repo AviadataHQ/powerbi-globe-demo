@@ -1,7 +1,6 @@
-// Shapefiles.js (standalone for GitHub Pages)
+// Shapefiles.js (clean, stable, GitHub Pages ready)
 // Requires: worldwind.min.js loaded BEFORE this file in index.html
-// Also requires: images/ folder present at same level as index.html
-// because WorldWind loads ./images/white-dot.png etc.
+// Requires: ./images folder present next to index.html
 
 (function () {
   "use strict";
@@ -18,15 +17,15 @@
 
   const WorldWind = window.WorldWind;
 
-  // IMPORTANT: tells WorldWind where to find the ./images folder
-  // Your repo should be:
+  // IMPORTANT: tells WorldWind where to find ./images
+  // Repo should be:
   // /index.html
   // /worldwind.min.js
   // /Shapefiles.js
   // /images/...
   WorldWind.configuration.baseUrl = "./";
 
-  // Tell WorldWind to log only warnings and errors.
+  // Reduce log noise
   WorldWind.Logger.setLoggingLevel(WorldWind.Logger.LEVEL_WARNING);
 
   // ----------------------------
@@ -36,17 +35,14 @@
 
   // ----------------------------
   // Base layers + UI layers
-  // (REMOVED Bing layers to avoid API key / "resources" errors)
+  // (No Bing layers -> no API key warnings/errors)
   // ----------------------------
   const layers = [
-    // Imagery layers
     { name: "Blue Marble (BMNG)", layer: new WorldWind.BMNGLayer(), enabled: true },
     { name: "BMNG + Landsat", layer: new WorldWind.BMNGLandsatLayer(), enabled: false },
 
-    // Atmosphere
     { name: "Atmosphere", layer: new WorldWind.AtmosphereLayer(), enabled: false },
 
-    // UI layers
     { name: "Compass", layer: new WorldWind.CompassLayer(), enabled: false },
     { name: "Coordinates", layer: new WorldWind.CoordinatesDisplayLayer(wwd), enabled: false },
     { name: "View Controls", layer: new WorldWind.ViewControlsLayer(wwd), enabled: false }
@@ -58,19 +54,7 @@
   });
 
   // ----------------------------
-  // Placemark attributes (for point shapefiles like cities)
-  // ----------------------------
-  const placemarkAttributes = new WorldWind.PlacemarkAttributes(null);
-  placemarkAttributes.imageScale = 0.025;
-  placemarkAttributes.imageColor = WorldWind.Color.WHITE;
-  placemarkAttributes.labelAttributes.offset = new WorldWind.Offset(
-    WorldWind.OFFSET_FRACTION, 0.5,
-    WorldWind.OFFSET_FRACTION, 1.0
-  );
-  placemarkAttributes.imageSource = WorldWind.configuration.baseUrl + "images/white-dot.png";
-
-  // ----------------------------
-  // Shapefile styling callback
+  // Country polygon styling callback
   // ----------------------------
   const shapeConfigurationCallback = function (attributes, record) {
     const configuration = {};
@@ -83,20 +67,11 @@
       attributes.values.Name ||
       attributes.values.name ||
       attributes.values.SOVEREIGNT ||
-      attributes.values.sovreignt ||
       attributes.values.SOVEREIGN ||
-      attributes.values.sovereign ||
       null;
 
-    if (record.isPointType()) {
-      configuration.attributes = new WorldWind.PlacemarkAttributes(placemarkAttributes);
-
-      // scale by population if available (cities)
-      if (attributes.values.pop_max) {
-        const population = attributes.values.pop_max;
-        configuration.attributes.imageScale = 0.01 * Math.log(population);
-      }
-    } else if (record.isPolygonType()) {
+    // Countries are polygons
+    if (record.isPolygonType()) {
       configuration.attributes = new WorldWind.ShapeAttributes(null);
 
       // Pastel fill
@@ -104,14 +79,14 @@
         0.375 + 0.5 * Math.random(),
         0.375 + 0.5 * Math.random(),
         0.375 + 0.5 * Math.random(),
-        0.8
+        0.80
       );
 
       // Dark outline
       configuration.attributes.outlineColor = new WorldWind.Color(
-        0.5 * configuration.attributes.interiorColor.red,
-        0.5 * configuration.attributes.interiorColor.green,
-        0.5 * configuration.attributes.interiorColor.blue,
+        0.50 * configuration.attributes.interiorColor.red,
+        0.50 * configuration.attributes.interiorColor.green,
+        0.50 * configuration.attributes.interiorColor.blue,
         1.0
       );
 
@@ -122,33 +97,27 @@
   };
 
   // ----------------------------
-  // Load Shapefiles (Countries + Cities)
+  // Load shapefiles (COUNTRIES ONLY)
   // ----------------------------
   const shapefileLibrary =
     "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/naturalearth";
 
-  // Countries layer
-  const worldLayer = new WorldWind.RenderableLayer("Countries");
-  const worldShapefile = new WorldWind.Shapefile(
+  const countriesLayer = new WorldWind.RenderableLayer("Countries");
+
+  const countriesShapefile = new WorldWind.Shapefile(
     shapefileLibrary + "/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp"
   );
-  worldShapefile.load(null, shapeConfigurationCallback, worldLayer);
-  worldLayer.enabled = true;
-  wwd.addLayer(worldLayer);
 
-  // Cities layer
-  const cityLayer = new WorldWind.RenderableLayer("Cities");
-  const cityShapefile = new WorldWind.Shapefile(
-    shapefileLibrary +
-      "/ne_50m_populated_places_simple/ne_50m_populated_places_simple.shp"
-  );
-  cityShapefile.load(null, shapeConfigurationCallback, cityLayer);
-  cityLayer.enabled = false;
-  wwd.addLayer(cityLayer);
+  countriesShapefile.load(null, shapeConfigurationCallback, countriesLayer);
+  countriesLayer.enabled = true;
+  wwd.addLayer(countriesLayer);
 
-  // Fort Story example shapefile
+  // ----------------------------
+  // Optional extra example layer (kept OFF by default)
+  // ----------------------------
   const fortStoryUrl =
     "https://worldwind.arc.nasa.gov/web/examples/data/shapefiles/misc/FortStory/Trident-Spectre-Indigo-i.shp";
+
   const fortStoryLayer = new WorldWind.RenderableLayer("Fort Story");
   const fortStoryShapefile = new WorldWind.Shapefile(fortStoryUrl);
   fortStoryShapefile.load(null, null, fortStoryLayer);
@@ -157,13 +126,13 @@
 
   // ----------------------------
   // UI: Layers list (checkboxes)
+  // (Cities removed completely)
   // ----------------------------
   const layerListDiv = document.getElementById("layerList");
 
   const allLayerEntries = [
     ...layers.map(x => ({ name: x.name, layer: x.layer })),
-    { name: "Countries", layer: worldLayer },
-    { name: "Cities", layer: cityLayer },
+    { name: "Countries", layer: countriesLayer },
     { name: "Fort Story", layer: fortStoryLayer }
   ];
 
@@ -254,13 +223,10 @@
   function gotoLocation(query) {
     if (!query) return;
 
-    geocoder.lookup(query, (geocoderResults) => {
-      if (geocoderResults && geocoderResults.length > 0) {
-        const result = geocoderResults[0];
-        const lat = parseFloat(result.lat);
-        const lon = parseFloat(result.lon);
-
-        wwd.goTo(new WorldWind.Location(lat, lon));
+    geocoder.lookup(query, (results) => {
+      if (results && results.length > 0) {
+        const r = results[0];
+        wwd.goTo(new WorldWind.Location(parseFloat(r.lat), parseFloat(r.lon)));
       } else {
         alert("Location not found: " + query);
       }
@@ -268,26 +234,25 @@
   }
 
   if (searchButton && searchText) {
-    searchButton.addEventListener("click", () => {
-      gotoLocation(searchText.value.trim());
-    });
+    searchButton.addEventListener("click", () => gotoLocation(searchText.value.trim()));
 
     searchText.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        gotoLocation(searchText.value.trim());
-      }
+      if (e.key === "Enter") gotoLocation(searchText.value.trim());
     });
   }
 
   // =======================================================
   // CLICK PICKING: show country name + highlight selection
+  //  ✅ stable highlight
+  //  ✅ ocean click clears
+  //  ✅ ignores non-country objects
   // =======================================================
 
-  // Guard: prevents duplicate installation if pasted twice
+  // Prevent duplicate installation
   if (!window.__COUNTRY_CLICK_INSTALLED__) {
     window.__COUNTRY_CLICK_INSTALLED__ = true;
 
-    // HUD (bottom-right)
+    // HUD
     const infoDiv = document.createElement("div");
     infoDiv.id = "countryInfoHUD";
     infoDiv.style.position = "fixed";
@@ -304,66 +269,66 @@
     infoDiv.innerHTML = "Click a country…";
     document.body.appendChild(infoDiv);
 
-    // Track selection
+    // Track selection safely
     let lastPickedShape = null;
     let lastPickedOriginalAttributes = null;
 
-    function highlightCountryShape(shape) {
-  if (!shape || !shape.attributes) return;
+    function clearSelection() {
+      if (lastPickedShape && lastPickedOriginalAttributes) {
+        lastPickedShape.attributes = lastPickedOriginalAttributes;
+      }
+      lastPickedShape = null;
+      lastPickedOriginalAttributes = null;
+      infoDiv.innerHTML = "Click a country…";
+      wwd.redraw();
+    }
 
-  // Restore previous selection
-  if (lastPickedShape && lastPickedOriginalAttributes) {
-    lastPickedShape.attributes = lastPickedOriginalAttributes;
-  }
+    function getCountryName(shape) {
+      if (!shape) return null;
 
-  lastPickedShape = shape;
-  lastPickedOriginalAttributes = shape.attributes;
+      // displayName is set by configuration.name
+      if (shape.displayName) return shape.displayName;
 
-  // Clone shape attributes safely
-  const highlightAttrs = new WorldWind.ShapeAttributes(shape.attributes);
-
-  // Strong outline
-  highlightAttrs.outlineWidth = 3.0;
-  highlightAttrs.outlineColor = new WorldWind.Color(1, 1, 1, 1);
-
-  // Interior color may not exist on some shapes -> guard it
-  if (highlightAttrs.interiorColor) {
-    highlightAttrs.interiorColor = new WorldWind.Color(
-      highlightAttrs.interiorColor.red,
-      highlightAttrs.interiorColor.green,
-      highlightAttrs.interiorColor.blue,
-      0.95
-    );
-  }
-
-  shape.attributes = highlightAttrs;
-  wwd.redraw();
-}
-
-    function getCountryNameFromPickedObject(pickedUserObject) {
-      if (!pickedUserObject) return null;
-
-      if (pickedUserObject.displayName) return pickedUserObject.displayName;
-
-      const attrs =
-        pickedUserObject.attributes?.values ||
-        pickedUserObject._attributes?.values ||
-        pickedUserObject.userProperties ||
+      const vals =
+        shape.attributes?.values ||
+        shape._attributes?.values ||
+        shape.userProperties ||
         null;
 
-      if (!attrs) return null;
+      if (!vals) return null;
 
-      return (
-        attrs.ADMIN ||
-        attrs.Admin ||
-        attrs.admin ||
-        attrs.NAME ||
-        attrs.Name ||
-        attrs.name ||
-        attrs.SOVEREIGNT ||
-        attrs.SOVEREIGN ||
-        null
-      );
+      return vals.ADMIN || vals.NAME || vals.SOVEREIGNT || vals.SOVEREIGN || null;
+    }
+
+    function highlightCountryShape(shape) {
+      if (!shape || !shape.attributes) return;
+
+      // Restore previous selection (if any)
+      if (lastPickedShape && lastPickedOriginalAttributes) {
+        lastPickedShape.attributes = lastPickedOriginalAttributes;
+      }
+
+      // Save original attributes (clone so we can restore properly)
+      lastPickedShape = shape;
+      lastPickedOriginalAttributes = new WorldWind.ShapeAttributes(shape.attributes);
+
+      // Highlight attributes
+      const highlightAttrs = new WorldWind.ShapeAttributes(shape.attributes);
+      highlightAttrs.outlineWidth = 3.0;
+      highlightAttrs.outlineColor = new WorldWind.Color(1, 1, 1, 1);
+
+      // Make fill slightly stronger (if interiorColor exists)
+      if (highlightAttrs.interiorColor) {
+        highlightAttrs.interiorColor = new WorldWind.Color(
+          highlightAttrs.interiorColor.red,
+          highlightAttrs.interiorColor.green,
+          highlightAttrs.interiorColor.blue,
+          0.95
+        );
+      }
+
+      shape.attributes = highlightAttrs;
+      wwd.redraw();
     }
 
     function handleGlobeClick(event) {
@@ -371,27 +336,40 @@
       const y = event.clientY;
 
       const pickList = wwd.pick(wwd.canvasCoordinates(x, y));
-      if (!pickList.objects || pickList.objects.length === 0) return;
 
+      // Ocean or nothing picked -> clear
+      if (!pickList.objects || pickList.objects.length === 0) {
+        clearSelection();
+        return;
+      }
+
+      // Find the first polygon country shape
       for (let i = 0; i < pickList.objects.length; i++) {
         const picked = pickList.objects[i];
-        const shape = picked.userObject;
+        const obj = picked.userObject;
 
-        if (!shape || !shape.attributes) continue;
+        // Only allow polygon shapes (countries)
+        if (!obj || !obj.attributes) continue;
 
-        const countryName = getCountryNameFromPickedObject(shape);
+        // Reject placemarks / non-polygons by checking if it has interiorColor
+        // (countries do; most other objects won't)
+        if (!obj.attributes.interiorColor) continue;
 
-        if (countryName) {
-          infoDiv.innerHTML = `<b>Selected:</b> ${countryName}`;
-          highlightCountryShape(shape);
-          return;
-        }
+        const name = getCountryName(obj);
+        if (!name) continue;
+
+        infoDiv.innerHTML = `<b>Selected:</b> ${name}`;
+        highlightCountryShape(obj);
+        return;
       }
+
+      // Clicked something but not a country -> clear
+      clearSelection();
     }
 
     wwd.addEventListener("click", handleGlobeClick);
   }
 
-  // Force initial redraw
+  // Initial draw
   wwd.redraw();
 })();
