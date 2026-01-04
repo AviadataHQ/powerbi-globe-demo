@@ -309,33 +309,36 @@
     let lastPickedOriginalAttributes = null;
 
     function highlightCountryShape(shape) {
-      if (!shape || !shape.attributes) return;
+  if (!shape || !shape.attributes) return;
 
-      // Restore previous
-      if (lastPickedShape && lastPickedOriginalAttributes) {
-        lastPickedShape.attributes = lastPickedOriginalAttributes;
-      }
+  // Restore previous selection
+  if (lastPickedShape && lastPickedOriginalAttributes) {
+    lastPickedShape.attributes = lastPickedOriginalAttributes;
+  }
 
-      lastPickedShape = shape;
-      lastPickedOriginalAttributes = shape.attributes;
+  lastPickedShape = shape;
+  lastPickedOriginalAttributes = shape.attributes;
 
-      const highlightAttrs = new WorldWind.ShapeAttributes(shape.attributes);
+  // Clone shape attributes safely
+  const highlightAttrs = new WorldWind.ShapeAttributes(shape.attributes);
 
-      highlightAttrs.outlineWidth = 3.0;
-      highlightAttrs.outlineColor = new WorldWind.Color(1, 1, 1, 1);
+  // Strong outline
+  highlightAttrs.outlineWidth = 3.0;
+  highlightAttrs.outlineColor = new WorldWind.Color(1, 1, 1, 1);
 
-      if (highlightAttrs.interiorColor) {
-        highlightAttrs.interiorColor = new WorldWind.Color(
-          highlightAttrs.interiorColor.red,
-          highlightAttrs.interiorColor.green,
-          highlightAttrs.interiorColor.blue,
-          0.95
-        );
-      }
+  // Interior color may not exist on some shapes -> guard it
+  if (highlightAttrs.interiorColor) {
+    highlightAttrs.interiorColor = new WorldWind.Color(
+      highlightAttrs.interiorColor.red,
+      highlightAttrs.interiorColor.green,
+      highlightAttrs.interiorColor.blue,
+      0.95
+    );
+  }
 
-      shape.attributes = highlightAttrs;
-      wwd.redraw();
-    }
+  shape.attributes = highlightAttrs;
+  wwd.redraw();
+}
 
     function getCountryNameFromPickedObject(pickedUserObject) {
       if (!pickedUserObject) return null;
