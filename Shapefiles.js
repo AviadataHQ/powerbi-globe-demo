@@ -118,6 +118,132 @@
   worldShapefile.load(null, shapeConfigurationCallback, worldLayer);
   wwd.addLayer(worldLayer);
 
+  // =======================================================
+// CLICK PICKING: show country name + highlight selection
+// =======================================================
+
+// Make a small HUD to show the selected country name
+const infoDiv = document.createElement("div");
+infoDiv.id = "countryInfoHUD";
+infoDiv.style.position = "fixed";
+infoDiv.style.right = "18px";
+infoDiv.style.bottom = "18px";
+infoDiv.style.padding = "10px 14px";
+infoDiv.style.background = "rgba(0,0,0,0.65)";
+infoDiv.style.color = "white";
+infoDiv.style.fontFamily = "Arial, sans-serif";
+infoDiv.style.fontSize = "14px";
+infoDiv.style.borderRadius = "10px";
+infoDiv.style.boxShadow = "0 8px 18px rgba(0,0,0,0.35)";
+infoDiv.style.zIndex = "9999";
+infoDiv.innerHTML = "Click a country…";
+document.body.appendChild(infoDiv);
+
+// Keep track of the last picked shape so we can un-highlight it
+let lastPickedShape = null;
+let lastPickedOriginalAttributes = null;
+
+// Helper: highlight a polygon (country)
+function highlightCountryShape(shape) {
+  if (!shape || !shape.attributes) return;
+
+  // Restore previous selection
+  if (lastPickedShape && lastPickedOriginalAttributes) {
+    lastPickedShape.attributes = lastPickedOriginalAttributes;
+  }
+
+  // Save current attributes (so we can restore later)
+  lastPickedShape = shape;
+  lastPickedOriginalAttributes = shape.attributes;
+
+  // Create new highlight attributes based on existing
+  const highlightAttrs = new WorldWind.ShapeAttributes(shape.attributes);
+
+  // Make border thicker + brighter
+  highlightAttrs.outlineWidth = 3.0;
+  highlightAttrs.outlineColor = new WorldWind.Color(1, 1, 1, 1); // white outline
+
+  // Slightly increase opacity
+  if (highlightAttrs.interiorColor) {
+    highlightAttrs.interiorColor = new WorldWind.Color(
+      highlightAttrs.interiorColor.red,
+      highlightAttrs.interiorColor.green,
+      highlightAttrs.interiorColor.blue,
+      0.95
+    );
+  }
+
+  shape.attributes = highlightAttrs;
+  wwd.redraw();
+}
+
+// Helper: extract a country name from shapefile record attributes
+function getCountryNameFromPickedObject(pickedUserObject) {
+  // Many of the shapefile renderables have "displayName"
+  if (pickedUserObject && pickedUserObject.displayName) {
+    return pickedUserObject.displayName;
+  }
+
+  // Some store the original shapefile record/attributes
+  // We’ll try common NaturalEarth field names:
+  const attrs =
+    pickedUserObject &&
+    (pickedUserObject.attributes?.values ||
+      pickedUserObject._attributes?.values ||
+      pickedUserObject.userProperties ||
+      null);
+
+  if (!attrs) return null;
+
+  return (
+    attrs.ADMIN ||
+    attrs.Admin ||
+    attrs.admin ||
+    attrs.NAME ||
+    attrs.Name ||
+    attrs.name ||
+    attrs.SOVEREIGNT ||
+    attrs.SOVEREIGN ||
+    null
+  );
+}
+
+// Click handler: pick objects and detect a country polygon
+function handleGlobeClick(event) {
+  const x = event.clientX;
+  const y = event.clientY;
+
+  const pickList = wwd.pick(wwd.canvasCoordinates(x, y));
+  if (!pickList.objects || pickList.objects.length === 0) return;
+
+  // Prefer countries first if multiple objects are picked
+  // We’ll search for a picked object that belongs to your "Countries" layer.
+  // If we can’t detect the layer name, we still attempt to use the object.
+  for (let i = 0; i < pickList.objects.length; i++) {
+    const picked = pickList.objects[i];
+
+    // picked.userObject is the actual renderable
+    const shape = picked.userObject;
+
+    // Must be a shape with attributes (countries are polygons)
+    if (!shape || !shape.attributes) continue;
+
+    // Get a name if possible
+    const countryName = getCountryNameFromPickedObject(shape);
+
+    // If we got a name, treat it as the selected country
+    if (countryName) {
+      infoDiv.innerHTML = `<b>Selected:</b> ${countryName}`;
+      highlightCountryShape(shape);
+      return;
+    }
+  }
+}
+
+// Attach click listener to the WorldWind canvas
+wwd.addEventListener("click", handleGlobeClick);
+
+
   // Cities
   const cityLayer = new WorldWind.RenderableLayer("Cities");
   const cityShapefile = new WorldWind.Shapefile(
@@ -254,4 +380,130 @@
 
   // Initial redraw
   wwd.redraw();
+
+  // =======================================================
+// CLICK PICKING: show country name + highlight selection
+// =======================================================
+
+// Make a small HUD to show the selected country name
+const infoDiv = document.createElement("div");
+infoDiv.id = "countryInfoHUD";
+infoDiv.style.position = "fixed";
+infoDiv.style.right = "18px";
+infoDiv.style.bottom = "18px";
+infoDiv.style.padding = "10px 14px";
+infoDiv.style.background = "rgba(0,0,0,0.65)";
+infoDiv.style.color = "white";
+infoDiv.style.fontFamily = "Arial, sans-serif";
+infoDiv.style.fontSize = "14px";
+infoDiv.style.borderRadius = "10px";
+infoDiv.style.boxShadow = "0 8px 18px rgba(0,0,0,0.35)";
+infoDiv.style.zIndex = "9999";
+infoDiv.innerHTML = "Click a country…";
+document.body.appendChild(infoDiv);
+
+// Keep track of the last picked shape so we can un-highlight it
+let lastPickedShape = null;
+let lastPickedOriginalAttributes = null;
+
+// Helper: highlight a polygon (country)
+function highlightCountryShape(shape) {
+  if (!shape || !shape.attributes) return;
+
+  // Restore previous selection
+  if (lastPickedShape && lastPickedOriginalAttributes) {
+    lastPickedShape.attributes = lastPickedOriginalAttributes;
+  }
+
+  // Save current attributes (so we can restore later)
+  lastPickedShape = shape;
+  lastPickedOriginalAttributes = shape.attributes;
+
+  // Create new highlight attributes based on existing
+  const highlightAttrs = new WorldWind.ShapeAttributes(shape.attributes);
+
+  // Make border thicker + brighter
+  highlightAttrs.outlineWidth = 3.0;
+  highlightAttrs.outlineColor = new WorldWind.Color(1, 1, 1, 1); // white outline
+
+  // Slightly increase opacity
+  if (highlightAttrs.interiorColor) {
+    highlightAttrs.interiorColor = new WorldWind.Color(
+      highlightAttrs.interiorColor.red,
+      highlightAttrs.interiorColor.green,
+      highlightAttrs.interiorColor.blue,
+      0.95
+    );
+  }
+
+  shape.attributes = highlightAttrs;
+  wwd.redraw();
+}
+
+// Helper: extract a country name from shapefile record attributes
+function getCountryNameFromPickedObject(pickedUserObject) {
+  // Many of the shapefile renderables have "displayName"
+  if (pickedUserObject && pickedUserObject.displayName) {
+    return pickedUserObject.displayName;
+  }
+
+  // Some store the original shapefile record/attributes
+  // We’ll try common NaturalEarth field names:
+  const attrs =
+    pickedUserObject &&
+    (pickedUserObject.attributes?.values ||
+      pickedUserObject._attributes?.values ||
+      pickedUserObject.userProperties ||
+      null);
+
+  if (!attrs) return null;
+
+  return (
+    attrs.ADMIN ||
+    attrs.Admin ||
+    attrs.admin ||
+    attrs.NAME ||
+    attrs.Name ||
+    attrs.name ||
+    attrs.SOVEREIGNT ||
+    attrs.SOVEREIGN ||
+    null
+  );
+}
+
+// Click handler: pick objects and detect a country polygon
+function handleGlobeClick(event) {
+  const x = event.clientX;
+  const y = event.clientY;
+
+  const pickList = wwd.pick(wwd.canvasCoordinates(x, y));
+  if (!pickList.objects || pickList.objects.length === 0) return;
+
+  // Prefer countries first if multiple objects are picked
+  // We’ll search for a picked object that belongs to your "Countries" layer.
+  // If we can’t detect the layer name, we still attempt to use the object.
+  for (let i = 0; i < pickList.objects.length; i++) {
+    const picked = pickList.objects[i];
+
+    // picked.userObject is the actual renderable
+    const shape = picked.userObject;
+
+    // Must be a shape with attributes (countries are polygons)
+    if (!shape || !shape.attributes) continue;
+
+    // Get a name if possible
+    const countryName = getCountryNameFromPickedObject(shape);
+
+    // If we got a name, treat it as the selected country
+    if (countryName) {
+      infoDiv.innerHTML = `<b>Selected:</b> ${countryName}`;
+      highlightCountryShape(shape);
+      return;
+    }
+  }
+}
+
+// Attach click listener to the WorldWind canvas
+wwd.addEventListener("click", handleGlobeClick);
+
 })();
